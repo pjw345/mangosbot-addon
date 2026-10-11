@@ -1,0 +1,7 @@
+# Client state and local output are not addon source.
+WTF/
+SavedVariables/
+*.log
+*.bak
+*.zip
+__pycache__/

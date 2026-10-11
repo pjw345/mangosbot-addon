@@ -3,6 +3,9 @@ Mangosbot_EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_ADDON")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
+Mangosbot_EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+Mangosbot_EventFrame:RegisterEvent("PARTY_MEMBERS_CHANGED")
+Mangosbot_EventFrame:RegisterEvent("QUEST_LOG_UPDATE")
 Mangosbot_EventFrame:RegisterEvent("UPDATE")
 Mangosbot_EventFrame:Hide()
 
@@ -26,7 +29,17 @@ function SendBotCommand(text, chat, lang, channel)
     end
 end
 function SendBotAddonCommand(text, chat, lang, channel)
-    SendBotCommand("#a "..text, chat, lang, channel)
+    if (chat == "PARTY" and partySize() == 0) then return end
+    if (chat == "PARTY" and GetNumRaidMembers() > 0) then chat = "RAID" end
+
+    -- Vanilla-era ChatThrottleLib does not support addon WHISPER messages.
+    -- PARTY/RAID addon messages are genuinely silent; retain normal whispers
+    -- for selected-bot controls that need to address one bot directly.
+    if (chat == "PARTY" or chat == "RAID") then
+        SendAddonMessage("BOT", "#a "..text, chat, channel)
+    else
+        SendBotCommand("#a "..text, chat, lang, channel)
+    end
 end
 
 function CreateToolBar(frame, y, name, buttons, x, spacing, register)
@@ -169,6 +182,343 @@ function ToggleButton(frame, toolbar, button, toggle, mixed)
     else
         btn:SetBackdropBorderColor(0, 0, 0, 0.0)
     end
+end
+
+-- Party quest status ---------------------------------------------------------
+-- Playerbots do not run client addons, so ordinary quest-sharing addons cannot
+-- see their quest logs. Capture the replies from a manual PlayerBots quest
+-- query and build a compact status table for the player's tracked quests.
+local BotQuestStatus = {}
+local QuestStatusLastQuery = 0
+local QuestStatusMaxRows = 6
+
+local function QuestStatusKey(title)
+    if not title then return "" end
+    title = string.gsub(title, "|c%x%x%x%x%x%x%x%x", "")
+    title = string.gsub(title, "|r", "")
+    title = string.gsub(title, "^%s+", "")
+    title = string.gsub(title, "%s+$", "")
+    return string.lower(title)
+end
+
+local function ExtractQuestTitle(message)
+    local _, _, title = string.find(message or "", "|h%[([^%]]+)%]|h")
+    return title
+end
+
+local function GetPartyBotNames()
+    local names = {}
+    for i = 1, partySize() do
+        local name = partyName(i)
+        local unit = "party" .. i
+        if GetNumRaidMembers() > 0 then unit = "raid" .. i end
+        if name and botTable[name] and botTable[name]["online"] and UnitIsConnected(unit) then
+            table.insert(names, name)
+        end
+    end
+    table.sort(names)
+    return names
+end
+
+local function GetTrackedQuestTitles()
+    local tracked = {}
+    local fallback = {}
+    local entries = GetNumQuestLogEntries()
+
+    for i = 1, entries do
+        local title, level, tag, isHeader = GetQuestLogTitle(i)
+        if title and not isHeader then
+            table.insert(fallback, title)
+            if IsQuestWatched and IsQuestWatched(i) then
+                table.insert(tracked, title)
+            end
+        end
+    end
+
+    -- Some 1.12 quest-log replacements do not expose watched state.
+    if tablelength(tracked) == 0 then return fallback end
+    return tracked
+end
+
+local function JoinQuestNames(names)
+    if tablelength(names) == 0 then return "None" end
+    table.sort(names)
+    return table.concat(names, ", ")
+end
+
+local function ShortQuestTitle(title, maxLength)
+    if string.len(title) <= maxLength then return title end
+    return string.sub(title, 1, maxLength - 3) .. "..."
+end
+
+function RefreshPartyQuestStatus()
+    if not BotRoster or not BotRoster.questStatusPanel then return end
+
+    local panel = BotRoster.questStatusPanel
+    local botNames = GetPartyBotNames()
+    local quests = GetTrackedQuestTitles()
+    local total = tablelength(botNames)
+
+    panel.header:SetText("Have   Core*  Tracked quest")
+
+    for i = 1, QuestStatusMaxRows do
+        local row = panel.rows[i]
+        local title = quests[i]
+
+        if title and total > 0 then
+            local key = QuestStatusKey(title)
+            local have = 0
+            local complete = 0
+            local waiting = 0
+            local completedNames = {}
+            local incompleteNames = {}
+            local missingNames = {}
+            local waitingNames = {}
+
+            for _, name in pairs(botNames) do
+                local snapshot = BotQuestStatus[name]
+                if not snapshot or snapshot.pending then
+                    waiting = waiting + 1
+                    table.insert(waitingNames, name)
+                else
+                    local quest = snapshot.quests[key]
+                    if quest then
+                        have = have + 1
+                        if quest.status == "complete" then
+                            complete = complete + 1
+                            table.insert(completedNames, name)
+                        else
+                            table.insert(incompleteNames, name)
+                        end
+                    else
+                        table.insert(missingNames, name)
+                    end
+                end
+            end
+
+            local haveText = tostring(have) .. "/" .. tostring(total)
+            local doneText = tostring(complete) .. "/" .. tostring(total)
+            if waiting > 0 then
+                haveText = "..."
+                doneText = "..."
+            end
+
+            row.text:SetText(haveText .. "     " .. doneText .. "     " .. ShortQuestTitle(title, 19))
+            if waiting > 0 then
+                row.text:SetTextColor(0.65, 0.65, 0.65, 1)
+            elseif complete == total then
+                row.text:SetTextColor(0.2, 1.0, 0.2, 1)
+            elseif have < total then
+                row.text:SetTextColor(1.0, 0.35, 0.2, 1)
+            else
+                row.text:SetTextColor(1.0, 0.82, 0.0, 1)
+            end
+
+            row.tooltipText = title ..
+                "\n|cff20ff20Complete:|r " .. JoinQuestNames(completedNames) ..
+                "\n|cffffff00In progress:|r " .. JoinQuestNames(incompleteNames) ..
+                "\n|cffff5030Not accepted:|r " .. JoinQuestNames(missingNames) ..
+                "\n|cffaaaaaa*Core is PlayerBots' stored completion flag. It may be wrong until the quest giver checks the turn-in.|r"
+            if waiting > 0 then
+                row.tooltipText = row.tooltipText ..
+                    "\n|cffaaaaaaWaiting for:|r " .. JoinQuestNames(waitingNames)
+            end
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+
+    if tablelength(quests) == 0 then
+        panel.header:SetText("No tracked quests")
+    elseif total == 0 then
+        panel.header:SetText("No PlayerBots in the party")
+    elseif tablelength(quests) > QuestStatusMaxRows then
+        panel.header:SetText("Have   Core*  Tracked quest (first 6)")
+    end
+end
+
+function QueryPartyQuestStatus(force)
+    if not BotRoster or not BotRoster:IsVisible() or partySize() == 0 then return end
+
+    local names = GetPartyBotNames()
+    if tablelength(names) == 0 then
+        BotQuestStatus = {}
+        RefreshPartyQuestStatus()
+        return
+    end
+
+    local now = GetTime()
+    if not force and now - QuestStatusLastQuery < 2 then return end
+    QuestStatusLastQuery = now
+
+    BotQuestStatus = {}
+    for _, name in pairs(names) do
+        BotQuestStatus[name] = { phase = nil, quests = {}, pending = true }
+    end
+
+    RefreshPartyQuestStatus()
+    -- This is deliberately manual and visible. Silent PARTY addon traffic is
+    -- heard by every bot and can make bots process one another's replies.
+    SendChatMessage("quests all", "PARTY")
+end
+
+function HandlePartyQuestStatusMessage(message, sender)
+    if not sender then return end
+
+    local cleanSender = string.gsub(sender, "%-.*$", "")
+    local snapshot = BotQuestStatus[cleanSender]
+    if not snapshot then
+        for name, candidate in pairs(BotQuestStatus) do
+            if string.lower(name) == string.lower(cleanSender) then
+                cleanSender = name
+                snapshot = candidate
+                break
+            end
+        end
+    end
+    if not snapshot then return end
+
+    if string.find(message, "--- Incompleted quests ---", 1, true) == 1 then
+        snapshot.phase = "incomplete"
+    elseif string.find(message, "--- Completed quests ---", 1, true) == 1 then
+        snapshot.phase = "complete"
+    elseif string.find(message, "--- Summary ---", 1, true) == 1 then
+        snapshot.phase = "summary"
+    elseif string.find(message, "Total:", 1, true) == 1 then
+        snapshot.pending = false
+        snapshot.phase = nil
+    elseif snapshot.phase == "incomplete" or snapshot.phase == "complete" then
+        local title = ExtractQuestTitle(message)
+        if title then
+            snapshot.quests[QuestStatusKey(title)] = {
+                title = title,
+                status = snapshot.phase
+            }
+        end
+    end
+
+    RefreshPartyQuestStatus()
+end
+
+-- Run one deliberate loot action. Automatic post-combat scans and repeated
+-- hidden group commands caused excessive chatter in this PlayerBots build.
+function LootNearbyCorpsesForParty()
+    if tablelength(GetPartyBotNames()) == 0 then
+        DEFAULT_CHAT_FRAME:AddMessage("MangosBot: no online PlayerBots are in the party.")
+        return
+    end
+    SendChatMessage("do loot", "PARTY")
+end
+
+function CreateQuestStatusPanel(frame)
+    local panel = CreateFrame("Frame", "MangosBotQuestStatusPanel", frame)
+    panel:SetWidth(176)
+    panel:SetHeight(88)
+
+    panel.header = panel:CreateFontString(nil, "OVERLAY")
+    panel.header:SetPoint("TOPLEFT", panel, "TOPLEFT", 2, 0)
+    panel.header:SetWidth(172)
+    panel.header:SetHeight(12)
+    panel.header:SetFont("Fonts/FRIZQT__.TTF", 9, "OUTLINE")
+    panel.header:SetJustifyH("LEFT")
+    panel.header:SetText("Have   Core*  Tracked quest")
+
+    panel.rows = {}
+    for i = 1, QuestStatusMaxRows do
+        local row = CreateFrame("Button", "MangosBotQuestStatusRow" .. i, panel)
+        row:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -12 - ((i - 1) * 12))
+        row:SetWidth(176)
+        row:SetHeight(12)
+        row:EnableMouse(true)
+
+        row.text = row:CreateFontString(nil, "OVERLAY")
+        row.text:SetAllPoints(row)
+        row.text:SetFont("Fonts/FRIZQT__.TTF", 9, "OUTLINE")
+        row.text:SetJustifyH("LEFT")
+
+        row:SetScript("OnEnter", function()
+            if this.tooltipText then
+                GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+                GameTooltip:SetText(this.tooltipText)
+                GameTooltip:Show()
+            end
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        row:Hide()
+        panel.rows[i] = row
+    end
+
+    return panel
+end
+
+function CreateQuestActionBar(frame)
+    local bar = CreateFrame("Frame", "MangosBotQuestActionBar", frame)
+    bar:SetWidth(176)
+    bar:SetHeight(70)
+
+    local function CreateQuestButton(name, label, command, tooltip, x, width, handler)
+        local btn = CreateFrame("Button", "MangosBotQuest" .. name .. "Button", bar)
+        btn:SetPoint("TOPLEFT", bar, "TOPLEFT", x, 0)
+        btn:SetWidth(width)
+        btn:SetHeight(20)
+        btn:SetBackdrop({
+            bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
+            edgeFile = "Interface/ChatFrame/ChatFrameBackground",
+            tile = true, tileSize = 16, edgeSize = 1,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 }
+        })
+        btn:SetBackdropBorderColor(0.65, 0.65, 0.65, 1.0)
+        btn:EnableMouse(true)
+        btn:RegisterForClicks("LeftButtonDown")
+
+        btn.text = btn:CreateFontString(nil, "OVERLAY")
+        btn.text:SetPoint("CENTER", btn, "CENTER", 0, 0)
+        btn.text:SetFont("Fonts/FRIZQT__.TTF", 10, "OUTLINE")
+        btn.text:SetText(label)
+
+        btn:SetScript("OnClick", function()
+            if handler then
+                handler()
+                return
+            end
+            -- Quest commands must be sent as ordinary party chat, exactly as
+            -- if the player had entered "/p <command>" in the chat box.
+            if tablelength(GetPartyBotNames()) == 0 then
+                DEFAULT_CHAT_FRAME:AddMessage("MangosBot: no online PlayerBots are in the party.")
+                return
+            end
+            SendChatMessage(command, "PARTY")
+        end)
+        btn:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+            GameTooltip:SetText(tooltip)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+
+        return btn
+    end
+
+    bar.quests = CreateQuestButton("List", "Quests", nil, "Manually refresh every party bot's quests (/p quests all)", 0, 50, function() QueryPartyQuestStatus(true) end)
+    bar.accept = CreateQuestButton("Accept", "Accept", "do accept all quests", "Accept available quests from your selected NPC (/p do accept all quests)", 54, 50)
+    bar.turnin = CreateQuestButton("TurnIn", "Turn In", "do talk to quest giver", "Hand in completed quests to your selected NPC (/p do talk to quest giver)", 108, 62)
+    bar.useObject = CreateQuestButton("UseObject", "Use Object", "u go", "Use the nearest game object (/p u go)", 0, 54)
+    bar.useObject:ClearAllPoints()
+    bar.useObject:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, -24)
+    bar.sell = CreateQuestButton("Sell", "Sell Junk", "s vendor", "Sell items classified for a nearby vendor (/p s vendor)", 59, 58)
+    bar.sell:ClearAllPoints()
+    bar.sell:SetPoint("TOPLEFT", bar, "TOPLEFT", 59, -24)
+    bar.equip = CreateQuestButton("Equip", "Equip", "do equip upgrades", "Equip each bot's available upgrades (/p do equip upgrades)", 122, 48)
+    bar.equip:ClearAllPoints()
+    bar.equip:SetPoint("TOPLEFT", bar, "TOPLEFT", 122, -24)
+    bar.loot = CreateQuestButton("Loot", "Loot Nearby Corpses", nil, "Run one manual loot action for the party (/p do loot)", 0, 170, LootNearbyCorpsesForParty)
+    bar.loot:ClearAllPoints()
+    bar.loot:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, -48)
+
+    return bar
 end
 
 function EnablePositionSaving(frame, frameName)
@@ -417,6 +767,12 @@ function CreateBotRoster()
 
     GroupToolBars["group_generic_combat"] = CreateGenericCombatToolBar(frame, 0, "group_generic_combat", true, 5, 0, false)
     frame.toolbar["group_generic_combat"]:SetBackdropBorderColor(0,0,0,0.0)
+
+    frame.questActionBar = CreateQuestActionBar(frame)
+    frame.questActionBar:Hide()
+
+    frame.questStatusPanel = CreateQuestStatusPanel(frame)
+    frame.questStatusPanel:Hide()
 
     return frame
 end
@@ -1859,6 +2215,10 @@ function QuerySelectedBot(name)
 end
 
 Mangosbot_EventFrame:SetScript("OnEvent", function(self)
+    if (event == "PLAYER_ENTERING_WORLD" or event == "PARTY_MEMBERS_CHANGED" or event == "QUEST_LOG_UPDATE") then
+        RefreshPartyQuestStatus()
+    end
+
     if (event == "PLAYER_TARGET_CHANGED") then
         local name = GetUnitName("target")
         local self = GetUnitName("player")
@@ -1966,7 +2326,12 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 end)
                 logoutBtn["key"] = key
                 logoutBtn:SetScript("OnClick", function()
-                    SendBotCommand(".bot rm " .. logoutBtn["key"], "SAY")
+                    local botName = logoutBtn["key"]
+                    SendBotCommand(".bot rm " .. botName, "SAY")
+                    if botTable[botName] then botTable[botName]["online"] = false end
+                    BotQuestStatus[botName] = nil
+                    RefreshPartyQuestStatus()
+                    wait(1, function() SendBotCommand(".bot list", "SAY") end)
                 end)
                 inviteBtn["key"] = key
                 inviteBtn:SetScript("OnClick", function()
@@ -2044,6 +2409,12 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
             logoutAllBtn["allBots"] = allBots
             logoutAllBtn:SetScript("OnClick", function()
                 SendBotCommand(".bot rm " .. logoutAllBtn["allBots"], "SAY")
+                for botName, botData in pairs(botTable) do
+                    botData["online"] = false
+                    BotQuestStatus[botName] = nil
+                end
+                RefreshPartyQuestStatus()
+                wait(1, function() SendBotCommand(".bot list", "SAY") end)
             end)
 
             local inviteAllBtn = tb.buttons["invite_all"]
@@ -2128,7 +2499,26 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 genericCombatToolBar:Hide()
             end
 
+            local questActionBar = BotRoster.questActionBar
+            local questStatusPanel = BotRoster.questStatusPanel
+            if (atLeastOneBotInParty) then
+                questActionBar:Show()
+                y = y + 24
+                questActionBar:SetPoint("TOPLEFT", BotRoster, "TOPLEFT", 5, -y)
+                -- The action bar has three 20px rows. Leave its full height
+                -- before positioning the quest-status table underneath it.
+                y = y + 72
+                questStatusPanel:Show()
+                questStatusPanel:SetPoint("TOPLEFT", BotRoster, "TOPLEFT", 5, -y)
+                y = y + 88
+                RefreshPartyQuestStatus()
+            else
+                questActionBar:Hide()
+                questStatusPanel:Hide()
+            end
+
             UpdateGroupToolBar()
+            if (width < 186) then width = 186 end
             BotRoster:SetWidth(width)
             BotRoster:SetHeight(y + 22)
         end
@@ -2138,8 +2528,21 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
         --print(event.." 1 "..arg1.." 2 "..arg2.." 3 "..arg3.." 4 "..arg4)
         local message = arg1
         local sender = arg2
-        if (event == "CHAT_MSG_ADDON") then sender = arg4 end
+        if (event == "CHAT_MSG_ADDON") then
+            -- The 1.12 server sends PlayerBot replies as CHAT_MSG_ADDON chat
+            -- packets, where arg1 is the message and arg2 is the bot name.
+            -- Some newer clients expose the modern prefix/message/channel/
+            -- sender layout instead, so accept that form as a fallback too.
+            if arg1 == "BOT" and arg4 then
+                message = arg2
+                sender = arg4
+            else
+                message = arg1
+                sender = arg2
+            end
+        end
 
+        HandlePartyQuestStatusMessage(message, sender)
         OnWhisper(message, sender)
         
         if (BotDebugPanel:IsVisible()) then
