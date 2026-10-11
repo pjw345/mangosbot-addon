@@ -34,7 +34,8 @@ Candidates for separate reviewed changes:
 | Role and assist controls | 5eb5814 | Verify tank/heal/DPS switching does not replace existing custom strategies unexpectedly. |
 | Repair and class controls | 28bf4a2, 605339b, b421157, 0591741 | Verify supported server command names and Vanilla APIs individually. |
 
-No Celguar gameplay changes have been merged in this snapshot. Retain the
+The original import contained no Celguar gameplay changes. Version turtle.14
+selectively adapts the controls described in [the port notes](docs/CELGUAR_PORT.md). Retain the
 original authorship and upstream history; this fork does not introduce a new
 licence grant for upstream code. Repository publication does not itself grant
 additional rights to redistribute upstream material.

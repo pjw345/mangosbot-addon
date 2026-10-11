@@ -68,3 +68,9 @@ PlayerBots remain in the party.
 Select your bot to bring Bot Controls window. Use numerous buttons to control your bot actions.
 
 ![Screenshot](screenshots/bot_controls.png)
+
+## Compatible Celguar controls
+
+Version `1.1.0-turtle.14` adds priest healing modes, repair and assist controls,
+current strategy reply parsing and a roster above ten bots. See the
+[port notes and client test checklist](docs/CELGUAR_PORT.md).
