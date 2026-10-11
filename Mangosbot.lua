@@ -593,28 +593,7 @@ function ResizeBotPanel(frame, width, height)
     end
 end
 
-function CreateBotRoster()
-    local frame = CreateFrame("Frame", "BotRoster", UIParent)
-    frame:Hide()
-    frame:SetWidth(186)
-    frame:SetHeight(175)
-    frame:SetPoint("CENTER", UIParent, "CENTER")
-    frame:EnableMouse(true)
-    frame:SetMovable(true)
-    frame:SetFrameStrata("DIALOG")
-    frame:SetBackdropColor(0, 0, 0, 1.0)
-    frame:SetBackdrop({
-        bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
-        tile = true, tileSize = 16, edgeSize = 0,
-        insets = { left = 0, right = 0, top = 0, bottom = 0 }
-    })
-    frame:SetBackdropBorderColor(0, 0, 0, 1)
-    frame:RegisterForDrag("LeftButton")
-
-    EnablePositionSaving(frame, "BotRoster")
-
-    frame.items = {}
-    for i = 1,10 do
+function CreateBotRosterItem(frame, i)
         local item = CreateFrame("Frame", "BotRoster_Item" .. i, frame)
         item:SetPoint("TOPLEFT", frame, "TOPLEFT", i * 100, 0)
         item:SetWidth(112)
@@ -718,8 +697,31 @@ function CreateBotRoster()
 
         item:Hide()
         frame.items[i] = item
-        frame.ShowRequest = false
-    end
+        return item
+end
+
+function CreateBotRoster()
+    local frame = CreateFrame("Frame", "BotRoster", UIParent)
+    frame:Hide()
+    frame:SetWidth(186)
+    frame:SetHeight(175)
+    frame:SetPoint("CENTER", UIParent, "CENTER")
+    frame:EnableMouse(true)
+    frame:SetMovable(true)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetBackdropColor(0, 0, 0, 1.0)
+    frame:SetBackdrop({
+        bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
+        tile = true, tileSize = 16, edgeSize = 0,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 }
+    })
+    frame:SetBackdropBorderColor(0, 0, 0, 1)
+    frame:RegisterForDrag("LeftButton")
+
+    EnablePositionSaving(frame, "BotRoster")
+
+    frame.items = {}
+    frame.ShowRequest = false
 
     CreateToolBar(frame, 0, "quickbar", {
         ["login_all"] = {
@@ -1368,6 +1370,12 @@ function CreateSelectedBotPanel()
             tooltip = "Show equipment",
             index = 4
         },
+        ["repair"] = {
+            icon = "equip",
+            command = {[0] = "repair"},
+            tooltip = "Repair at an available repair vendor",
+            index = 6
+        },
         ["mail"] = {
             icon = "mail",
             command = {[0] = "mail ?"},
@@ -1427,6 +1435,13 @@ function CreateSelectedBotPanel()
 
     y = y + 25
     CreateToolBar(frame, -y, "attack_type", {
+        ["tank_assist"] = {
+            icon = "tank_assist",
+            command = {[0] = "nc -dps assist,+tank assist,?", [1] = "co -dps assist,+tank assist,?"},
+            strategy = "tank assist",
+            tooltip = "Tank assist (disables DPS assist)",
+            index = 6
+        },
         ["tank_aoe"] = {
             icon = "tank_aoe",
             command = {[0] = "nc +tank aoe,?",[1] = "co +tank aoe,?"},
@@ -1436,9 +1451,9 @@ function CreateSelectedBotPanel()
         },
         ["dps_assist"] = {
             icon = "dps_assist",
-            command = {[0] = "nc +dps assist,?",[1] = "co +dps assist,?"},
+            command = {[0] = "nc -tank assist,+dps assist,?",[1] = "co -tank assist,+dps assist,?"},
             strategy = "dps assist",
-            tooltip = "Assist others",
+            tooltip = "DPS assist (disables tank assist)",
             index = 1
         },
         ["defense"] = {
@@ -1675,23 +1690,49 @@ function CreateSelectedBotPanel()
         }
     })
     CreateToolBar(frame, -y, "CLASS_PRIEST", {
+        ["healer_only"] = {
+            icon = "heal",
+            command = {[0] = "co +holy,-offdps,-offheal,?", [1] = "nc +holy,-offdps,-offheal,?", [2] = "de +holy,-offdps,-offheal,?", [3] = "react +holy,-offdps,-offheal,?"},
+            tooltip = "Holy healer only: disable off-DPS and off-healing",
+            index = 7
+        },
+        ["healer_dps"] = {
+            icon = "dps",
+            command = {[0] = "co +holy,+offdps,-offheal,?", [1] = "nc +holy,+offdps,-offheal,?", [2] = "de +holy,+offdps,-offheal,?", [3] = "react +holy,+offdps,-offheal,?"},
+            tooltip = "Holy healer with off-DPS: allow damage while healing",
+            index = 8
+        },
+        ["offheal"] = {
+            icon = "heal",
+            command = {[0] = "co ~offheal,?", [1] = "nc ~offheal,?"},
+            strategy = "offheal",
+            tooltip = "Toggle off-healing while in DPS mode",
+            index = 9
+        },
+        ["preheal"] = {
+            icon = "heal",
+            command = {[0] = "co ~preheal,?"},
+            strategy = "preheal",
+            tooltip = "Toggle preventive healing",
+            index = 10
+        },
         ["heal"] = {
             icon = "heal",
-            command = {[0] = "co +heal,?"},
-            strategy = "heal",
-            tooltip = "Healer mode",
+            command = {[0] = "co +discipline,?", [1] = "nc +discipline,?", [2] = "de +discipline,?", [3] = "react +discipline,?"},
+            strategy = "discipline",
+            tooltip = "Discipline healing specialisation",
             index = 0
         },
         ["holy"] = {
             icon = "holy",
-            command = {[0] = "co +holy,?"},
+            command = {[0] = "co +holy,?", [1] = "nc +holy,?", [2] = "de +holy,?", [3] = "react +holy,?"},
             strategy = "holy",
             tooltip = "Use holy spells",
             index = 1
         },
         ["shadow"] = {
             icon = "shadow",
-            command = {[0] = "co +shadow,?"},
+            command = {[0] = "co +shadow,?", [1] = "nc +shadow,?", [2] = "de +shadow,?", [3] = "react +shadow,?"},
             strategy = "shadow",
             tooltip = "Dps mode: shadow",
             index = 2
@@ -2237,15 +2278,15 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 BotRoster:Show()
                 BotRoster.ShowRequest = false
             end
-            for i = 1,10 do
-                BotRoster.items[i]:Hide()
+            for _, item in pairs(BotRoster.items) do
+                item:Hide()
             end
             local index = 1
             local x = 5
             local width = 0
             local height = 0
             local y = 5
-            local colCount = 2
+            local colCount = math.max(2, math.ceil(botCount() / 10))
             local allBots = ""
             local first = true
             local allBotsLoggedIn = true
@@ -2253,11 +2294,8 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
             local allBotsInParty = true
             local atLeastOneBotInParty = false
             for key,bot in pairs(botTable) do
-                if (index > 10) then 
-                    index = 1 
-                    y = 5
-                end
                 local item = BotRoster.items[index]
+                if not item then item = CreateBotRosterItem(BotRoster, index) end
                 if (first) then first = false
                 else allBots = allBots .. "," end
                 allBots = allBots .. key
@@ -2378,9 +2416,7 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
                 y = y + (5 + height)
             end
             
-            if (botCount() >= 10) then 
-                y = 230
-            end
+            -- Keep the toolbars below the actual roster rows.
                         
             local tb = BotRoster.toolbar["quickbar"]
             tb:SetPoint("TOPLEFT", BotRoster, "TOPLEFT", 5, -y)
@@ -2748,26 +2784,43 @@ function OnWhisper(message, sender)
     end
 
     local bot = botTable[sender]
-    if (string.find(message, 'Strategies: ') == 1) then
+    -- Accept current engine-qualified replies and the original Vanilla form.
+    local engine, text
+    local prefixes = {
+        ["Combat Strategies: "] = "co",
+        ["Non Combat Strategies: "] = "nc",
+        ["Dead Strategies: "] = "de",
+        ["Reaction Strategies: "] = "react",
+        ["Strategies: "] = "co"
+    }
+    for prefix, name in pairs(prefixes) do
+        if string.sub(message, 1, string.len(prefix)) == prefix then
+            engine = name
+            text = string.sub(message, string.len(prefix) + 1)
+            break
+        end
+    end
+    if engine then
         local list = {}
-        local type = "co"
-        local role = "dps"
-        local text = string.sub(message, 13)
-        local splitted = splitString2(text, ", ")
+        local healer, tank = false, false
+        local splitted = splitString2(text, ",")
         for i = 1, tablelength(splitted) do
             local name = trim2(splitted[i])
-            table.insert(list, name)
-            if (name == "nc") then type = 'nc' end
-            if (name == "heal") then role = "heal" end
-            if (name == "tank" or name == "bear") then role = "tank" end
+            if name == "nc" and string.find(message, 'Strategies: ') == 1 then
+                engine = "nc"
+            elseif name ~= "" then
+                table.insert(list, name)
+            end
+            if name == "heal" or name == "holy" or name == "discipline" or name == "restoration" then healer = true end
+            if name == "tank" or name == "bear" or name == "protection" or name == "tank feral" then tank = true end
         end
-        if (bot['strategy'] == nil) then
-            bot['strategy'] = {nc = {}, co = {}}
+        if not bot.strategy then bot.strategy = {nc = {}, co = {}, de = {}, react = {}} end
+        if engine == "co" then
+            if tank then bot.role = "tank"
+            elseif healer then bot.role = "heal"
+            else bot.role = "dps" end
         end
-        if (type == "co") then
-            bot["role"] = role
-        end
-        bot['strategy'][type] = list
+        bot.strategy[engine] = list
     end
     if (string.find(message, 'Formation: ') == 1) then
         bot['formation'] = string.sub(message, 11)
