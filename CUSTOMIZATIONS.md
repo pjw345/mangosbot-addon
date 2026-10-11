@@ -46,3 +46,6 @@ For future comparisons:
     git fetch upstream 1.12
     git fetch celguar 1.12
     git log --oneline upstream/1.12..celguar/1.12
+
+Detailed server command checks are recorded in
+[the compatibility review](docs/CELGUAR_COMPATIBILITY.md).
