@@ -1,5 +1,6 @@
 local Mangosbot_EventFrame = CreateFrame("Frame")
 Mangosbot_EventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+Mangosbot_EventFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_WHISPER")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_ADDON")
 Mangosbot_EventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
@@ -2260,7 +2261,17 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
         RefreshPartyQuestStatus()
     end
 
+    if event == "PLAYER_REGEN_DISABLED" and CurrentBot == nil then
+        SelectedBotPanel:Hide()
+    end
+
     if (event == "PLAYER_TARGET_CHANGED") then
+        -- Combat targeting must not open the control UI or issue bot queries.
+        -- A bot deliberately pinned through the roster remains available.
+        if UnitAffectingCombat("player") then
+            if CurrentBot == nil then SelectedBotPanel:Hide() end
+            return
+        end
         local name = GetUnitName("target")
         local self = GetUnitName("player")
         if (CurrentBot == nil and (name == nil or not UnitExists("target") or UnitIsEnemy("target", "player") or not UnitIsPlayer("target") or name == self)) then
@@ -2622,6 +2633,11 @@ Mangosbot_EventFrame:SetScript("OnEvent", function(self)
         local selected = GetUnitName("target")
         if (CurrentBot ~= nil) then selected = CurrentBot end
         if (sender == selected) then
+            -- A reply queued before combat must not reopen an automatic panel.
+            if CurrentBot == nil and UnitAffectingCombat("player") then
+                SelectedBotPanel:Hide()
+                return
+            end
             SelectedBotPanel:Show()
 
             local tmp, class = "Unknown";
