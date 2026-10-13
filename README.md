@@ -74,3 +74,11 @@ Select your bot to bring Bot Controls window. Use numerous buttons to control yo
 Version `1.1.0-turtle.14` adds priest healing modes, repair and assist controls,
 current strategy reply parsing and a roster above ten bots. See the
 [port notes and client test checklist](docs/CELGUAR_PORT.md).
+
+## Combat targeting
+
+Version `1.1.0-turtle.15` prevents ordinary combat target changes from opening
+the bot panel or querying the selected bot. Entering combat hides an automatic
+panel, and delayed replies cannot reopen it. Click a bot's control icon in the
+roster to deliberately pin its panel; this remains available during combat.
+Ordinary targeting outside combat retains its existing behaviour.

@@ -47,6 +47,8 @@ function UnitClass() return "Priest", "PRIEST" end
 function UnitExists() return true end
 function UnitIsEnemy() return false end
 function UnitIsPlayer() return true end
+combat = false
+function UnitAffectingCombat() return combat end
 function GetTime() return 0 end
 function GetNumQuestLogEntries() return 0 end
 function UIDropDownMenu_Initialize() end
@@ -100,6 +102,44 @@ arg1, arg2, arg3, arg4 = "BOT", "Combat Strategies: discipline", "WHISPER", "Mer
 events()
 check(botTable.Mercy.strategy.co[1] == "discipline", "modern reply fallback")
 
+-- Combat targets and late replies cannot reopen the automatic panel.
+local queries = 0
+local queryOriginal = QuerySelectedBot
+QuerySelectedBot = function() queries = queries + 1 end
+CurrentBot = nil
+combat = false
+event = "PLAYER_TARGET_CHANGED"
+events()
+check(queries == 1, "out-of-combat query retained")
+SelectedBotPanel:Show()
+combat = true
+event = "PLAYER_REGEN_DISABLED"
+events()
+check(not SelectedBotPanel.visible, "combat entry hides automatic panel")
+event = "PLAYER_TARGET_CHANGED"
+events()
+check(queries == 1, "combat targets do not query")
+event = "CHAT_MSG_ADDON"
+arg1, arg2, arg3, arg4 = "Combat Strategies: holy", "Mercy", nil, nil
+events()
+check(not SelectedBotPanel.visible, "late reply stays hidden")
+check(botTable.Mercy.strategy.co[1] == "holy", "late reply still updates cached state")
+CurrentBot = "Mercy"
+events()
+check(SelectedBotPanel.visible, "explicit roster selection works in combat")
+event = "PLAYER_TARGET_CHANGED"
+events()
+check(CurrentBot == "Mercy" and SelectedBotPanel.visible, "combat targets preserve manual selection")
+event = "PLAYER_REGEN_DISABLED"
+events()
+check(SelectedBotPanel.visible, "combat entry preserves manual panel")
+CurrentBot = nil
+combat = false
+event = "CHAT_MSG_ADDON"
+events()
+check(SelectedBotPanel.visible, "automatic panel still works out of combat")
+QuerySelectedBot = queryOriginal
+
 -- Execute real button dispatch; preserve numeric command sequence order.
 wait = function(_, fn, a, b) fn(a,b) end
 CurrentBot = "Mercy"
@@ -140,4 +180,4 @@ RenderRoster(20)
 RenderRoster(11)
 RenderRoster(3)
 ''')
-print('PASS: Lua 5.1 syntax, strategy replies, both chat layouts, role controls, ordered dispatch, repair/assist and 20/11/3-bot roster rendering')
+print('PASS: Lua 5.1 syntax, strategy replies, both chat layouts, combat panel guards, role controls, ordered dispatch, repair/assist and 20/11/3-bot roster rendering')
