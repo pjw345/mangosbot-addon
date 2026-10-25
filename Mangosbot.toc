@@ -5,7 +5,7 @@
 ## Version: 1.1.0-turtle.14
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
-##SavedVariables: frameopts
+##SavedVariables: frameopts, BotResourceIconsDB
 ## OptionalDeps: pfQuest
 Mangosbot.lua
 ResourceMarkers.lua

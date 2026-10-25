@@ -1,0 +1,10 @@
+## Interface: 11200
+## Title: Bot Resource Icons
+## Notes: Nearby ore and herb minimap icons from your grouped bots. Requires matching server support and pfQuest.
+## Author: Paul and Codex
+## Version: 1.0.0
+## DefaultState: Enabled
+## OptionalDeps: pfQuest
+## SavedVariables: BotResourceIconsDB
+
+ResourceMarkers.lua

@@ -89,3 +89,11 @@ The indicators show profession/skill eligibility, not combat safety or path acce
 Validate with actual ore and herbs, both professions, node depletion, bot removal,
 zoning, minimap zoom and existing native tracking before declaring live acceptance.
 The implementation is source-only until the server and addon are deployed together.
+
+### Standalone installation alongside Warband
+
+The same tested module is also packaged as `standalone/BotResourceIcons`; install
+that folder into Interface/AddOns to use icons with Warband without enabling the
+retired MangosBot interface. Its settings use BotResourceIconsDB, separate from
+MangosBot frame options. Both packages share a load guard to avoid duplicate polls
+if enabled together. `/botresources` commands and pfQuest requirements are identical.

@@ -1,4 +1,5 @@
 -- WoW 1.12 / Lua 5.0. Resource data comes from the controlled bots, not chat.
+if MangosbotResources then return end -- Avoid duplicate polling if both packages are enabled.
 MangosbotResources = { snapshots = {}, pending = {}, pins = {}, wanted = {} }
 local M = MangosbotResources
 local token, nextPoll, nextDraw = math.mod(math.floor(GetTime() * 1000), 1000000000) + 1, 0, 0
@@ -25,7 +26,7 @@ local function Coordinate(text)
   if value and value <= 100 then return value end
 end
 function M.Mode()
-  local mode = frameopts and frameopts.resourceMarkers
+  local mode = BotResourceIconsDB and BotResourceIconsDB.resourceMarkers
   if mode == "both" or mode == "ore" or mode == "herbs" or mode == "off" then return mode end
   return "both"
 end
@@ -170,7 +171,7 @@ SLASH_MANGOSBOTRESOURCES1 = "/botresources"
 SlashCmdList.MANGOSBOTRESOURCES = function(text)
   text = string.lower(text or "")
   if text == "off" or text == "both" or text == "ore" or text == "herbs" then
-    frameopts = frameopts or {}; frameopts.resourceMarkers = text
+    BotResourceIconsDB = BotResourceIconsDB or {}; BotResourceIconsDB.resourceMarkers = text
     M.Clear(); nextPoll = GetTime() + 0.2
   end
   DEFAULT_CHAT_FRAME:AddMessage("Bot resource icons: " .. M.Mode() .. ". /botresources both|ore|herbs|off (requires matching server and pfQuest).")

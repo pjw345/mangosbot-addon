@@ -31,7 +31,7 @@ pfQuestCompat = {}
 pfMap = { minimap_sizes = { [38] = {1000,1000} }, minimap_zoom = {[1]={[0]=300}},
   minimap_indoor = function() return 1 end, GetMapIDByName = function() return 38 end,
   GetMapID = function() return selectedZone end }
-frameopts, SlashCmdList = {}, {}
+BotResourceIconsDB, SlashCmdList = {}, {}
 DEFAULT_CHAT_FRAME = { AddMessage = function() end }
 dofile(arg[1] or "ResourceMarkers.lua")
 local M = MangosbotResources
@@ -60,9 +60,9 @@ receive("S:1:3:Alon:38:2:2:"..herb)
 assert(M.snapshots.Alon.rows[1].guid=="17370383791809394007", "partial replacement preserves previous snapshot")
 receive("S:1:3:Alon:38:1:2:"..row)
 assert(table.getn(M.snapshots.Alon.rows)==2, "out of order pages assembled atomically")
-frameopts.resourceMarkers="ore"; assert(table.getn(M.VisibleNodes(38))==1)
-frameopts.resourceMarkers="herbs"; assert(table.getn(M.VisibleNodes(38))==1)
-frameopts.resourceMarkers="both"
+BotResourceIconsDB.resourceMarkers="ore"; assert(table.getn(M.VisibleNodes(38))==1)
+BotResourceIconsDB.resourceMarkers="herbs"; assert(table.getn(M.VisibleNodes(38))==1)
+BotResourceIconsDB.resourceMarkers="both"
 local original = M.snapshots.Alon
 for _, body in ipairs({ "S:1:2:Alon:38:1:1:"..row,
   "S:1:1:Stranger:38:1:1:"..row, "S:1:1:Alon:38:17:17:"..row,
@@ -76,7 +76,7 @@ M.pending={}; receive("S:1:1:Alon:38:1:1:")
 assert(table.getn(M.snapshots.Alon.rows)==0, "empty snapshot clears depleted nodes")
 roster={"Alon"}; assert(table.getn(M.VisibleNodes(38))==0, "departed bot loses its markers")
 roster={"Alon","Mercy"}; now=23; assert(table.getn(M.VisibleNodes(38))==0, "stale data expires")
-frameopts.resourceMarkers="off"; M.Poll(); assert(not next(M.snapshots) and not next(M.wanted))
-frameopts.resourceMarkers="both"; pfMap=nil; M.Poll(); assert(not next(M.wanted), "no requests without rendering support")
-frameopts.resourceMarkers = {}; assert(M.Mode()=="both", "invalid saved setting uses safe default")
+BotResourceIconsDB.resourceMarkers="off"; M.Poll(); assert(not next(M.snapshots) and not next(M.wanted))
+BotResourceIconsDB.resourceMarkers="both"; pfMap=nil; M.Poll(); assert(not next(M.wanted), "no requests without rendering support")
+BotResourceIconsDB.resourceMarkers = {}; assert(M.Mode()=="both", "invalid saved setting uses safe default")
 print("PASS: Lua 5.0 resource protocol, roster, TTL, depletion, filters, rendering and map-view isolation")
