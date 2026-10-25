@@ -2,9 +2,11 @@
 ## Title: MangosBot
 ## Author: ike3
 ## Notes: MangosBot UI
-## Version: 1.1.0-turtle.13
+## Version: 1.1.0-turtle.14
 ## DefaultState: Enabled
 ## LoadOnDemand: 0
 ##SavedVariables: frameopts
+## OptionalDeps: pfQuest
 Mangosbot.lua
+ResourceMarkers.lua
 Mangosbot.xml

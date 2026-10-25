@@ -49,3 +49,12 @@ For future comparisons:
 
 Detailed server command checks are recorded in
 [the compatibility review](docs/CELGUAR_COMPATIBILITY.md).
+
+## Group resource minimap icons
+
+ResourceMarkers.lua is a separate Turtle extension loaded after Mangosbot.lua.
+It polls only when pfQuest minimap support is available. It uses that support's
+dimensions/zoom APIs without modifying pfQuest nodes or the map selection. The
+read-only RESBOT protocol requires matching server support; it does not scrape
+chat or learn/grant tracking spells. Roster, zone and expiry cleanup fail closed.
+Use `/botresources off` to disable. No installed client is modified by this PR.

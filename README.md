@@ -68,3 +68,24 @@ PlayerBots remain in the party.
 Select your bot to bring Bot Controls window. Use numerous buttons to control your bot actions.
 
 ![Screenshot](screenshots/bot_controls.png)
+
+## Group resource icons (Turtle extension)
+
+With the matching server RESBOT implementation and pfQuest installed, nearby ore
+and herb nodes eligible for controlled grouped bots appear as separate minimap
+icons. Both types can appear together without changing your character's tracking.
+Use `/botresources both`, `ore`, `herbs` or `off`; the default is both. Resource
+icons do not start gathering. Active polling suppresses the bots' old resource
+pings and `I see a ...` speech. Ordinary group pings remain available.
+
+Snapshots refresh approximately every 5.5 seconds when bot command processing is
+available. Depletion clears on the next snapshot; stale data expires after twelve
+seconds. Leaving bots and zone transitions clear markers. Up to 32 nearest eligible
+nodes per bot are reported, with duplicates merged. Unsupported instance/map
+coordinates hide markers. Viewing a different world map hides icons rather than
+changing your map selection. pfQuest's own minimap pins and quest data are untouched.
+The indicators show profession/skill eligibility, not combat safety or path access.
+
+Validate with actual ore and herbs, both professions, node depletion, bot removal,
+zoning, minimap zoom and existing native tracking before declaring live acceptance.
+The implementation is source-only until the server and addon are deployed together.
