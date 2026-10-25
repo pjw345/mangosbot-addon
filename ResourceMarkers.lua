@@ -25,7 +25,9 @@ local function Coordinate(text)
   if value and value <= 100 then return value end
 end
 function M.Mode()
-  return frameopts and frameopts.resourceMarkers or "both"
+  local mode = frameopts and frameopts.resourceMarkers
+  if mode == "both" or mode == "ore" or mode == "herbs" or mode == "off" then return mode end
+  return "both"
 end
 function M.Clear()
   M.snapshots, M.pending, M.wanted = {}, {}, {}
